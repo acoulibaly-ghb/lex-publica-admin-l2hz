@@ -1,6 +1,4 @@
 
-import { KV_REST_API_URL, KV_REST_API_TOKEN } from '@vercel/kv';
-
 export const config = {
     runtime: 'edge',
 };
