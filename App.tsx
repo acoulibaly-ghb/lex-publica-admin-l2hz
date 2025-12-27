@@ -16,7 +16,7 @@ const themeStyles: Record<string, { bg: string, text: string }> = {
 };
 
 const App = () => {
-  const { profiles } = useChatStore();
+  const { profiles, refreshProfiles, lastSync } = useChatStore();
   const [activeMode, setActiveMode] = useState<AppMode>(AppMode.TEXT);
   const [courseContent, setCourseContent] = useState<string>(DEFAULT_COURSE_CONTENT);
   const [voiceSummary, setVoiceSummary] = useState<string>(DEFAULT_VOICE_SUMMARY);
@@ -214,6 +214,8 @@ const App = () => {
                 initialThemeColor={themeColor} onSaveThemeColor={setThemeColor}
                 onResetAll={handleResetDefaults}
                 profiles={profiles}
+                onRefreshProfiles={refreshProfiles}
+                lastSync={lastSync}
               />
             ) : (
               <div className="flex items-center justify-center h-full">

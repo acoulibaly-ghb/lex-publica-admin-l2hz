@@ -7,16 +7,18 @@ export const config = {
 // Si non configuré, elle renvoie une erreur explicative pour le prof.
 
 export default async function handler(req: Request) {
-    const kvEnabled = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN;
+    // Support des formats : Vercel KV, Upstash Marketplace, ou préfixe personnalisé 'STORAGE'
+    const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || process.env.STORAGE_REST_API_URL;
+    const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || process.env.STORAGE_REST_API_TOKEN;
+    const kvEnabled = kvUrl && kvToken;
 
     // GET: Récupérer tous les profils (pour le dashboard prof)
     if (req.method === 'GET') {
-        if (!kvEnabled) return new Response(JSON.stringify({ error: 'DATABASE_NOT_CONFIGURED', message: 'Veuillez configurer Vercel KV pour la synchro globale.' }), { status: 500 });
+        if (!kvEnabled) return new Response(JSON.stringify({ error: 'DATABASE_NOT_CONFIGURED', message: 'Veuillez configurer Vercel KV ou Upstash Redis.' }), { status: 500 });
 
         try {
-            // Simulation ou appel réel si configuré
-            const profiles = await fetch(`${process.env.KV_REST_API_URL}/get/global_profiles`, {
-                headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}` }
+            const profiles = await fetch(`${kvUrl}/get/global_profiles`, {
+                headers: { Authorization: `Bearer ${kvToken}` }
             }).then(res => res.json()).then(data => JSON.parse(data.result || '[]'));
 
             return new Response(JSON.stringify(profiles), { headers: { 'Content-Type': 'application/json' } });
@@ -33,8 +35,8 @@ export default async function handler(req: Request) {
             const { profile } = await req.json();
 
             // On récupère la liste actuelle
-            const currentProfiles = await fetch(`${process.env.KV_REST_API_URL}/get/global_profiles`, {
-                headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}` }
+            const currentProfiles = await fetch(`${kvUrl}/get/global_profiles`, {
+                headers: { Authorization: `Bearer ${kvToken}` }
             }).then(res => res.json()).then(data => JSON.parse(data.result || '[]'));
 
             // On fusionne (mise à jour ou ajout)
@@ -46,9 +48,9 @@ export default async function handler(req: Request) {
             }
 
             // On sauvegarde
-            await fetch(`${process.env.KV_REST_API_URL}/set/global_profiles`, {
+            await fetch(`${kvUrl}/set/global_profiles`, {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}` },
+                headers: { Authorization: `Bearer ${kvToken}` },
                 body: JSON.stringify(currentProfiles)
             });
 

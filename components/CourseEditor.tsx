@@ -15,6 +15,8 @@ interface CourseEditorProps {
   onSaveThemeColor: (newColor: string) => void;
   onResetAll?: () => void;
   profiles: any[];
+  onRefreshProfiles?: () => void;
+  lastSync?: Date | null;
 }
 
 type Tab = 'content' | 'instruction' | 'appearance' | 'stats';
@@ -40,7 +42,9 @@ export const CourseEditor: React.FC<CourseEditorProps> = ({
   initialThemeColor,
   onSaveThemeColor,
   onResetAll,
-  profiles
+  profiles,
+  onRefreshProfiles,
+  lastSync
 }) => {
   const [activeTab, setActiveTab] = useState<Tab>('content');
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('master');
@@ -190,19 +194,36 @@ export const CourseEditor: React.FC<CourseEditorProps> = ({
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white">Suivi des Étudiants</h3>
-                <p className="text-sm text-slate-500">Aperçu anonymisé des performances de la promotion.</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-sm text-slate-500">Aperçu anonymisé des performances de la promotion.</p>
+                  {lastSync && (
+                    <span className="text-[10px] text-slate-400 italic">
+                      Dernière synchro : {lastSync.toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-xl border border-amber-200">
-                <span className="text-xs font-bold text-amber-600 block uppercase tracking-wider">Moyenne Globale</span>
-                <span className="text-xl font-black text-amber-700">
-                  {(() => {
-                    const allScores = profiles.flatMap(p => p.scores).filter(s => s.total > 0);
-                    if (allScores.length === 0) return '0%';
-                    const sumPoints = allScores.reduce((acc, s) => acc + s.score, 0);
-                    const sumTotal = allScores.reduce((acc, s) => acc + s.total, 0);
-                    return `${Math.round((sumPoints / sumTotal) * 100)}%`;
-                  })()}
-                </span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={onRefreshProfiles}
+                  className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold transition-all active:scale-95"
+                  title="Rafraîchir les données depuis le Cloud"
+                >
+                  <RefreshCw size={14} className={lastSync ? "" : "animate-spin"} />
+                  Rafraîchir
+                </button>
+                <div className="bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-xl border border-amber-200">
+                  <span className="text-xs font-bold text-amber-600 block uppercase tracking-wider">Moyenne Globale</span>
+                  <span className="text-xl font-black text-amber-700">
+                    {(() => {
+                      const allScores = profiles.flatMap(p => p.scores).filter(s => s.total > 0);
+                      if (allScores.length === 0) return '0%';
+                      const sumPoints = allScores.reduce((acc, s) => acc + s.score, 0);
+                      const sumTotal = allScores.reduce((acc, s) => acc + s.total, 0);
+                      return `${Math.round((sumPoints / sumTotal) * 100)}%`;
+                    })()}
+                  </span>
+                </div>
               </div>
             </div>
 

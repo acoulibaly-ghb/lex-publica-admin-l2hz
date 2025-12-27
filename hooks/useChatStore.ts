@@ -7,50 +7,77 @@ const PROFILES_KEY = 'droit_public_profiles';
 const ACTIVE_PROFILE_KEY = 'droit_public_active_profile';
 
 export const useChatStore = () => {
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [profiles, setProfiles] = useState<StudentProfile[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return [];
+    try {
+      return JSON.parse(stored).map((s: any) => ({
+        ...s,
+        messages: s.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
+      }));
+    } catch (e) { return []; }
+  });
 
-  useEffect(() => {
-    const storedSessions = localStorage.getItem(STORAGE_KEY);
-    const storedProfiles = localStorage.getItem(PROFILES_KEY);
-    const activeProfile = localStorage.getItem(ACTIVE_PROFILE_KEY);
+  const [profiles, setProfiles] = useState<StudentProfile[]>(() => {
+    const stored = localStorage.getItem(PROFILES_KEY);
+    return stored ? JSON.parse(stored) : [];
+  });
 
-    if (storedSessions) {
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
       try {
-        const revived = JSON.parse(storedSessions).map((s: any) => ({
-          ...s,
-          messages: s.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
-        }));
-        setSessions(revived);
-        if (revived.length > 0) setActiveSessionId(revived[0].id);
-      } catch (e) { createNewSession(); }
-    } else { createNewSession(); }
-
-    if (storedProfiles) {
-      try { setProfiles(JSON.parse(storedProfiles)); } catch (e) { setProfiles([]); }
+        const revived = JSON.parse(stored);
+        return revived.length > 0 ? revived[0].id : null;
+      } catch (e) { return null; }
     }
+    return null;
+  });
 
-    if (activeProfile) {
-      setCurrentProfileId(activeProfile);
-    }
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(() => {
+    return localStorage.getItem(ACTIVE_PROFILE_KEY);
+  });
 
-    // Tentative de synchro cloud au démarrage
-    fetch('/api/sync').then(res => res.json()).then(cloudProfiles => {
-      if (Array.isArray(cloudProfiles) && cloudProfiles.length > 0) {
+  const [lastSync, setLastSync] = useState<Date | null>(null);
+
+  const refreshProfiles = async () => {
+    try {
+      const res = await fetch('/api/sync');
+      const cloudProfiles = await res.json();
+      if (Array.isArray(cloudProfiles)) {
         setProfiles(prev => {
-          // Fusion simple : on préfère les données du cloud si le nombre de scores est plus élevé
           const merged = [...prev];
+
+          // 1. On intègre les données du cloud
           cloudProfiles.forEach(cp => {
             const idx = merged.findIndex(p => p.id === cp.id);
             if (idx === -1) merged.push(cp);
             else if (cp.scores.length > merged[idx].scores.length) merged[idx] = cp;
           });
+
+          // 2. On pousse les profils locaux qui ne sont pas encore sur le Cloud (cas d'Alice)
+          prev.forEach(lp => {
+            const inCloud = cloudProfiles.find(cp => cp.id === lp.id);
+            if (!inCloud || lp.scores.length > inCloud.scores.length) {
+              fetch('/api/sync', {
+                method: 'POST',
+                body: JSON.stringify({ profile: lp })
+              }).catch(() => { });
+            }
+          });
+
           return merged;
         });
+        setLastSync(new Date());
       }
-    }).catch(() => console.log("Cloud sync non configuré"));
+    } catch (e) { console.log("Erreur synchro cloud", e); }
+  };
+
+  useEffect(() => {
+    if (sessions.length === 0) {
+      createNewSession();
+    }
+    refreshProfiles();
   }, []);
 
   useEffect(() => {
@@ -74,7 +101,7 @@ export const useChatStore = () => {
       title: 'Nouvelle conversation',
       messages: [{
         role: 'model',
-        text: "Bonjour ! Je suis **Ada**, votre assistante de révision. Pour que je puisse suivre votre progression et enregistrer vos scores aux quiz, **commençons par faire connaissance : quel est votre prénom ou votre pseudo ?**",
+        text: "Bonjour ! Je suis **Ada**, votre assistante de révision. Pour que je puisse suivre votre progression, souhaitez-vous vous identifier ?\n\n[ ] Je veux bien me présenter\n[ ] Je préfère rester anonyme",
         timestamp: new Date()
       }],
       updatedAt: Date.now()
@@ -189,6 +216,8 @@ export const useChatStore = () => {
     logoutProfile,
     saveScore,
     profiles,
+    refreshProfiles,
+    lastSync,
     currentProfile: getCurrentProfile(),
     activeSession: getActiveSession()
   };
