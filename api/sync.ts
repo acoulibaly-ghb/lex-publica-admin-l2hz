@@ -1,64 +1,75 @@
-
+// Route API Edge haute performance
 export const config = {
     runtime: 'edge',
 };
 
-// Note: Cette route nécessite l'installation de @vercel/kv et la configuration des variables d'environnement
-// Si non configuré, elle renvoie une erreur explicative pour le prof.
-
 export default async function handler(req: Request) {
-    // Support des formats : Vercel KV, Upstash Marketplace, ou préfixe personnalisé 'STORAGE'
-    const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || process.env.STORAGE_REST_API_URL;
-    const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || process.env.STORAGE_REST_API_TOKEN;
-    const kvEnabled = kvUrl && kvToken;
-
-    // GET: Récupérer tous les profils (pour le dashboard prof)
-    if (req.method === 'GET') {
-        if (!kvEnabled) return new Response(JSON.stringify({ error: 'DATABASE_NOT_CONFIGURED', message: 'Veuillez configurer Vercel KV ou Upstash Redis.' }), { status: 500 });
-
-        try {
-            const profiles = await fetch(`${kvUrl}/get/global_profiles`, {
-                headers: { Authorization: `Bearer ${kvToken}` }
-            }).then(res => res.json()).then(data => JSON.parse(data.result || '[]'));
-
-            return new Response(JSON.stringify(profiles), { headers: { 'Content-Type': 'application/json' } });
-        } catch (e) {
-            return new Response(JSON.stringify([]), { status: 200 });
-        }
+    if (req.method !== 'POST') {
+        return new Response('Method Not Allowed', { status: 405 });
     }
 
-    // POST: Sauvegarder ou mettre à jour un profil
-    if (req.method === 'POST') {
-        if (!kvEnabled) return new Response(JSON.stringify({ error: 'DB_DISABLED' }), { status: 500 });
+    try {
+        const { messages, systemInstruction, courseContent } = await req.json();
+        const apiKey = process.env.API_KEY || process.env.VITE_API_KEY;
 
-        try {
-            const { profile } = await req.json();
-
-            // On récupère la liste actuelle
-            const currentProfiles = await fetch(`${kvUrl}/get/global_profiles`, {
-                headers: { Authorization: `Bearer ${kvToken}` }
-            }).then(res => res.json()).then(data => JSON.parse(data.result || '[]'));
-
-            // On fusionne (mise à jour ou ajout)
-            const index = currentProfiles.findIndex((p: any) => p.id === profile.id);
-            if (index !== -1) {
-                currentProfiles[index] = profile;
-            } else {
-                currentProfiles.push(profile);
-            }
-
-            // On sauvegarde
-            await fetch(`${kvUrl}/set/global_profiles`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${kvToken}` },
-                body: JSON.stringify(currentProfiles)
+        if (!apiKey) {
+            return new Response(JSON.stringify({ error: 'ClÃ© API non configurÃ©e' }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
             });
-
-            return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
-        } catch (e) {
-            return new Response(JSON.stringify({ error: 'SYNC_ERROR' }), { status: 500 });
         }
-    }
 
-    return new Response('Method Not Allowed', { status: 405 });
+        // Utilisation du modÃ¨le 2.0 Flash (confirmÃ© dans votre liste de modÃ¨les)
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+        // On limite l'historique aux 10 derniers messages pour Ã©viter les requÃªtes trop lourdes (Limit 4MB)
+        const recentMessages = messages.slice(-10);
+
+        const contents = recentMessages.map((m: any) => ({
+            role: m.role === 'model' ? 'model' : 'user',
+            parts: [
+                { text: m.text },
+                ...(m.file ? [{ inlineData: { mimeType: m.file.mimeType, data: m.file.data } }] : [])
+            ]
+        }));
+
+        const body = {
+            contents,
+            systemInstruction: {
+                parts: [{ text: `${systemInstruction}\n\nCONTEXTE DU COURS :\n${courseContent}` }]
+            },
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 2048,
+            }
+        };
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            return new Response(JSON.stringify({ error: data.error?.message || 'Erreur API Google' }), {
+                status: response.status,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "DÃ©solÃ©e, je n'ai pas pu gÃ©nÃ©rer de rÃ©ponse.";
+
+        return new Response(JSON.stringify({ text }), {
+            headers: { 'Content-Type': 'application/json' },
+        });
+    } catch (error: any) {
+        console.error(error);
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
 }
+
