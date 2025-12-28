@@ -96,14 +96,21 @@ export const useChatStore = () => {
   }, [currentProfileId]);
 
   const createNewSession = () => {
+    const profile = getCurrentProfile();
+    const isVisitor = !profile || profile.name === 'Visiteur';
+
     const newSession: ChatSession = {
       id: crypto.randomUUID(),
       title: 'Nouvelle conversation',
-      messages: [{
-        role: 'model',
-        text: "Bonjour ! Je suis **Ada**, votre assistante de révision. Pour que je puisse suivre votre progression, souhaitez-vous vous identifier ?\n\n[ ] Je veux bien me présenter\n[ ] Je préfère rester anonyme",
-        timestamp: new Date()
-      }],
+      messages: [
+        {
+          role: 'model',
+          text: isVisitor
+            ? `Bonjour ! Je suis **Ada**, votre assistante de révision. Pour que je puisse suivre votre progression, souhaitez-vous vous identifier ?\n\n[ ] Je veux bien me présenter\n[ ] Je préfère rester anonyme`
+            : `Ravi de vous retrouver pour une nouvelle session de révision, **${profile.name}** ! Sur quel point de Droit Public souhaitez-vous travailler aujourd'hui ?`,
+          timestamp: new Date()
+        }
+      ],
       updatedAt: Date.now()
     };
     setSessions(prev => [newSession, ...prev]);
@@ -156,6 +163,16 @@ export const useChatStore = () => {
 
   const createNewProfile = (name: string): StudentProfile => {
     const cleanName = name.trim();
+
+    // Si c'est un visiteur, on regarde si on en a déjà un
+    if (cleanName === 'Visiteur') {
+      const existingVisitor = profiles.find(p => p.name === 'Visiteur');
+      if (existingVisitor) {
+        setCurrentProfileId(existingVisitor.id);
+        return existingVisitor;
+      }
+    }
+
     const suffix = Math.floor(100 + Math.random() * 900);
     const newProfile: StudentProfile = {
       id: `${cleanName} #${suffix}`,

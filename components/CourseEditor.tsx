@@ -238,7 +238,7 @@ export const CourseEditor: React.FC<CourseEditorProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {profiles.filter(p => p.id !== 'Visiteur').map((p) => {
+                  {profiles.filter(p => p.name !== 'Visiteur').map((p) => {
                     const validScores = p.scores.filter((s: any) => s.total > 0);
                     const avg = validScores.length > 0
                       ? Math.round((validScores.reduce((acc: number, s: any) => acc + s.score, 0) / validScores.reduce((acc: number, s: any) => acc + s.total, 0)) * 100)
@@ -262,13 +262,13 @@ export const CourseEditor: React.FC<CourseEditorProps> = ({
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span className={`font-bold ${avg !== null ? (avg >= 50 ? 'text-emerald-600' : 'text-amber-600') : 'text-slate-300'}`}>
-                            {avg !== null ? `${avg}%` : '—'}
+                            {avg !== null ? `${avg}%` : 'Pas de test'}
                           </span>
                         </td>
                       </tr>
                     );
                   })}
-                  {profiles.filter(p => p.id !== 'Visiteur').length === 0 && (
+                  {profiles.filter(p => p.name !== 'Visiteur').length === 0 && (
                     <tr>
                       <td colSpan={4} className="px-4 py-10 text-center text-slate-400 italic">
                         Aucun étudiant enregistré pour le moment.

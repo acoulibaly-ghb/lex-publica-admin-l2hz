@@ -124,10 +124,14 @@ export const TextChat: React.FC<TextChatProps> = ({ courseContent, systemInstruc
     const looksLikeQuestion = lowerText.includes("?") || lowerText.length > 25 || lowerText.includes("qu'est-ce") || lowerText.includes("pourquoi") || lowerText.includes("comment") || lowerText.includes("arrêt") || lowerText.includes("service public");
 
     // Scénario : L'utilisateur refuse l'anonymat ou pose une question d'emblée
-    const isInitialPrompt = lastMsg?.text.includes("faire connaissance") || lastMsg?.text.includes("souhaitez-vous vous identifier");
+    const isInitialPrompt =
+      lastMsg?.text.includes("faire connaissance") ||
+      lastMsg?.text.includes("souhaitez-vous vous identifier") ||
+      lastMsg?.text.includes("prénom") ||
+      lastMsg?.text.includes("pseudo");
     const looksLikeQuickAction = text.includes("progression") || text.includes("QCM") || text.includes("Vrai/Faux") || text.includes("Cas pratique") || text.includes("Expliquez-moi") || text.includes("Plan Dissertation") || text.includes("Listez les arrêts");
 
-    if (isInitialPrompt && !currentProfile) {
+    if (isInitialPrompt && (!currentProfile || currentProfile.name === 'Visiteur')) {
       if (text === "Je préfère rester anonyme" || (looksLikeQuestion && !overrideInput) || (looksLikeQuickAction && !overrideInput)) {
         const profile = createNewProfile("Visiteur");
         addMessageToSession(activeSessionId, { role: 'user', text, timestamp: new Date() });
@@ -231,7 +235,7 @@ export const TextChat: React.FC<TextChatProps> = ({ courseContent, systemInstruc
 
     try {
       // Utilisation de fetch direct pour une structure de réponse garantie et robuste
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
       const contents = (activeSession?.messages || []).map(m => ({
         role: m.role === 'model' ? 'model' : 'user',
@@ -497,7 +501,6 @@ export const TextChat: React.FC<TextChatProps> = ({ courseContent, systemInstruc
     </div>
   );
 };
-
 
 
 
