@@ -24,6 +24,7 @@ export interface ChatMessage {
   isError?: boolean;
   file?: AttachedFile;
   selectedOption?: string; // Persistance du choix de quiz ou d'identité
+  selectedOptions?: string[]; // Pour les QCM à choix multiples
 }
 
 export interface ChatSession {

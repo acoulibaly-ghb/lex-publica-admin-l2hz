@@ -2570,6 +2570,7 @@ RÈGLE D'OR N°2 : DÉROULEMENT DU TEST
 2. IMPORTANT : Les choix de QCM/Quiz doivent être présentés ainsi :
 [ ] Option A
 [ ] Option B, etc.
+Si la question est un QCM à choix multiples (plusieurs bonnes réponses), tu DOIS ajouter explicitement "Plusieurs réponses possibles" avant les choix.
 Dans les boutons [ ], le texte doit être simple et court. Ne mettez AUCUN code HTML ou mise en forme (gras, couleur) à l'intérieur des crochets des boutons.
 3. RÉPONSE : Attendez l'étudiant.
 4. CORRECTION : Validez avec les sources du cours.

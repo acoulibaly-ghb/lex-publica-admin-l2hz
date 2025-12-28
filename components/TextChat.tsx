@@ -60,6 +60,7 @@ export const TextChat: React.FC<TextChatProps> = ({ courseContent, systemInstruc
     deleteSession,
     addMessageToSession,
     selectOptionInMessage,
+    selectOptionsInMessage,
     findProfilesByName,
     createNewProfile,
     loginToProfile,
@@ -76,6 +77,7 @@ export const TextChat: React.FC<TextChatProps> = ({ courseContent, systemInstruc
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null);
   const [disambiguationOptions, setDisambiguationOptions] = useState<string[]>([]);
+  const [checkedOptions, setCheckedOptions] = useState<string[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -287,10 +289,17 @@ export const TextChat: React.FC<TextChatProps> = ({ courseContent, systemInstruc
       addMessageToSession(activeSessionId, { role: 'model', text: `Erreur : ${error.message}`, timestamp: new Date(), isError: true });
     } finally {
       setIsLoading(false);
+      setCheckedOptions([]); // Reset selections after sending
     }
   };
 
-  const MessageRenderer = ({ text, msgIndex, role, selectedOption }: { text: string, msgIndex: number, role: string, selectedOption?: string }) => {
+  const toggleOption = (option: string) => {
+    setCheckedOptions(prev =>
+      prev.includes(option) ? prev.filter(o => o !== option) : [...prev, option]
+    );
+  };
+
+  const MessageRenderer = ({ text, msgIndex, role, selectedOption, selectedOptions }: { text: string, msgIndex: number, role: string, selectedOption?: string, selectedOptions?: string[] }) => {
     const mdPlugins = { rehypePlugins: [rehypeRaw], remarkPlugins: [remarkGfm] };
 
     if (role === 'user') return <ReactMarkdown {...mdPlugins}>{text}</ReactMarkdown>;
@@ -331,20 +340,49 @@ export const TextChat: React.FC<TextChatProps> = ({ courseContent, systemInstruc
       td: ({ children }: any) => <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">{children}</td>
     };
 
+    const isMultiChoice = text.toLowerCase().includes("plusieurs réponses possibles");
+    const isLastMessage = msgIndex === (activeSession?.messages.length || 0) - 1;
+
     return (
       <div className="space-y-3">
         {segments.map((seg, i) => {
           if (seg.type === 'button') {
-            const isSelected = selectedOption === seg.content || (disambiguationOptions.length > 0 && disambiguationOptions.includes(seg.content));
+            const isSelected = selectedOption === seg.content ||
+              (selectedOptions?.includes(seg.content)) ||
+              (disambiguationOptions.length > 0 && disambiguationOptions.includes(seg.content));
+
+            const isChecked = checkedOptions.includes(seg.content);
             const isNavButton = seg.content.toLowerCase().includes("oui") ||
               seg.content.toLowerCase().includes("prêt") ||
               seg.content.toLowerCase().includes("suite") ||
               seg.content.toLowerCase().includes("anonyme");
 
+            if (isMultiChoice && isLastMessage && !selectedOption && !selectedOptions) {
+              return (
+                <button
+                  key={i}
+                  disabled={isLoading}
+                  onClick={() => toggleOption(seg.content)}
+                  className={`flex items-center gap-3 w-full max-w-xl py-3 px-4 rounded-xl border-2 text-left transition-all active:scale-[0.98] 
+                    ${isChecked
+                      ? `bg-[#ad5c51]/10 ${colors.text} border-[#ad5c51] shadow-sm`
+                      : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 hover:border-slate-300'}`}
+                >
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors 
+                    ${isChecked ? 'border-[#ad5c51] bg-[#ad5c51] text-white' : 'border-slate-300 dark:border-slate-600'}`}>
+                    {isChecked ? <CheckCircle2 size={12} strokeWidth={3} /> : null}
+                  </div>
+                  <div className="font-semibold text-sm flex-1">
+                    <ReactMarkdown {...mdPlugins} components={{ p: ({ children }) => <span className="m-0 p-0">{children}</span> }}>{seg.content}</ReactMarkdown>
+                  </div>
+                </button>
+              );
+            }
+
             return (
               <button
                 key={i}
-                disabled={isLoading || (!!selectedOption && disambiguationOptions.length === 0)}
+                disabled={isLoading || (!!selectedOption && disambiguationOptions.length === 0) || (!!selectedOptions)}
                 onClick={() => sendMessage(seg.content, msgIndex, seg.content)}
                 className={`flex items-center gap-3 w-full max-w-xl py-3 px-4 rounded-xl border-2 text-left transition-all group active:scale-[0.98] 
                   ${isSelected
@@ -368,6 +406,23 @@ export const TextChat: React.FC<TextChatProps> = ({ courseContent, systemInstruc
             </ReactMarkdown>
           );
         })}
+
+        {isMultiChoice && isLastMessage && !selectedOption && !selectedOptions && segments.some(s => s.type === 'button') && (
+          <button
+            onClick={() => {
+              if (checkedOptions.length > 0) {
+                const combined = checkedOptions.join(', ');
+                selectOptionsInMessage(activeSessionId!, msgIndex, checkedOptions);
+                sendMessage(`Mes réponses : ${combined}`);
+              }
+            }}
+            disabled={isLoading || checkedOptions.length === 0}
+            className={`mt-2 flex items-center justify-center gap-2 px-6 py-3 ${colors.primary} text-white rounded-xl font-bold shadow-lg transition-all active:scale-95 disabled:opacity-50`}
+          >
+            <CheckCircle2 size={18} />
+            <span>Valider mes réponses</span>
+          </button>
+        )}
       </div>
     );
   };
@@ -438,7 +493,13 @@ export const TextChat: React.FC<TextChatProps> = ({ courseContent, systemInstruc
               </div>
               <div className={`flex flex-col max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div className={`px-4 py-3 md:px-5 md:py-3.5 rounded-2xl shadow-sm prose prose-sm md:prose-base max-w-full overflow-hidden ${msg.role === 'user' ? `${colors.primary} text-white rounded-tr-none prose-invert` : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-tl-none prose-slate dark:prose-invert'}`}>
-                  <MessageRenderer text={msg.text} msgIndex={idx} role={msg.role} selectedOption={msg.selectedOption} />
+                  <MessageRenderer
+                    text={msg.text}
+                    msgIndex={idx}
+                    role={msg.role}
+                    selectedOption={msg.selectedOption}
+                    selectedOptions={msg.selectedOptions}
+                  />
                 </div>
               </div>
             </div>

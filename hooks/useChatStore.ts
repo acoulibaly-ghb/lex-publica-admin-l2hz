@@ -157,6 +157,19 @@ export const useChatStore = () => {
     }));
   };
 
+  const selectOptionsInMessage = (sessionId: string, msgIndex: number, options: string[]) => {
+    setSessions(prev => prev.map(s => {
+      if (s.id === sessionId) {
+        const newMessages = [...s.messages];
+        if (newMessages[msgIndex]) {
+          newMessages[msgIndex] = { ...newMessages[msgIndex], selectedOptions: options };
+        }
+        return { ...s, messages: newMessages };
+      }
+      return s;
+    }));
+  };
+
   const findProfilesByName = (name: string) => {
     return profiles.filter(p => p.name.toLowerCase() === name.trim().toLowerCase());
   };
@@ -227,6 +240,7 @@ export const useChatStore = () => {
     deleteSession,
     addMessageToSession,
     selectOptionInMessage,
+    selectOptionsInMessage,
     findProfilesByName,
     createNewProfile,
     loginToProfile,
